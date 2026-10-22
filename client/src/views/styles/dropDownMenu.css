@@ -11,7 +11,6 @@
   overflow: hidden;
 }
 
-
 .dropdown-profile {
   padding: 1rem;
   background-color: #f5f8ff;
@@ -60,7 +59,6 @@
   transform: translateX(2px);
   cursor: pointer;
 }
-
 
 .dropdown a.logout {
   color: #d9534f;

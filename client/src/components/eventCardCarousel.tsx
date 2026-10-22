@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import "../views/styles/eventCardCarousel.css";
-import { Event } from "../types/types";
-import EventCard from './eventCard';
-import DraftEventCard from './draftEventCard';
+import { Event, UserType } from "../types/types";
 
 interface EventCardCarouselProps {
   events: Event[];
-  userType: "student" | "organization";
-  renderCard: (event: Event, userType: "student" | "organization") => React.ReactElement;
+  userType: UserType;
+  renderCard: (event: Event, userType: UserType) => React.ReactElement;
 }
 
 const EventCardCarousel: React.FC<EventCardCarouselProps> = ({ events, renderCard, userType }) => {
@@ -18,9 +16,7 @@ const EventCardCarousel: React.FC<EventCardCarouselProps> = ({ events, renderCar
   };
 
   const handleNext = () => {
-    setCurrentIndex((prevIndex) =>
-      Math.min(prevIndex + 1, events.length - 1)
-    );
+    setCurrentIndex((prevIndex) => Math.min(prevIndex + 1, events.length - 1));
   };
 
   return (
@@ -34,8 +30,8 @@ const EventCardCarousel: React.FC<EventCardCarouselProps> = ({ events, renderCar
           className="carousel-track"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
-          {events.map((event, index) => (
-            <div key={index} className="carousel-item">     
+          {events.map((event) => (
+            <div key={event.id} className="carousel-item">
               {renderCard(event, userType)}
             </div>
           ))}

@@ -270,7 +270,6 @@
   }
   
   
-  /* Responsive styles */
   @media (min-width: 768px) {
     .info-grid {
       grid-template-columns: 1fr 1fr;

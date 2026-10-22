@@ -2,9 +2,10 @@
   "name": "client",
   "version": "0.1.0",
   "private": true,
-  "proxy": "http://localhost:3000",
+  "proxy": "http://localhost:5001",
   "dependencies": {
-    "framer-motion": "^12.6.5",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.5.0",
@@ -14,14 +15,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "dev": "react-scripts start",
-    "lint": "eslint .",
-    "prepare": "husky install",
-    "format": "prettier --write .",
-    "clean": "rimraf build",
-    "analyze": "source-map-explorer build/static/js/*.js"
+    "test": "react-scripts test"
   },
   "browserslist": {
     "production": [
@@ -36,8 +30,6 @@
     ]
   },
   "devDependencies": {
-    "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.2",
-    "husky": "^9.1.7"
+    "@types/jest": "^27.5.2"
   }
 }

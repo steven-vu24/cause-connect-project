@@ -25,7 +25,6 @@
     font-weight: bold;
   }
 
-  /* Location Filter Styles */
   .location-filter-container {
     max-width: 900px;
     margin: 0 auto 40px auto;
@@ -177,7 +176,6 @@
     border-color: #1A83F8; 
   }
 
-  /* Responsive Design */
   @media (max-width: 768px) {
     .location-controls {
       flex-direction: column;

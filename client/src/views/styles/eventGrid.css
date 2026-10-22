@@ -1,11 +1,11 @@
 .event-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* More responsive grid */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
-  width: 80%; /* Slightly wider than 60% for better spacing */
+  width: 80%;
   margin: 0 auto;
   padding: 0;
-  align-items: stretch; /* Ensure all cards stretch to same height */
+  align-items: stretch;
 }
 
 .event-card-grid .event-card {
@@ -24,7 +24,7 @@
 }
 
 .show-more-container {
-  grid-column: 1 / -1; /* Span across all columns */
+  grid-column: 1 / -1;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -47,7 +47,6 @@
   background-color: #005fa3;
 }
 
-/* Mobile view */
 @media (max-width: 1200px) {
   .event-card-grid {
     grid-template-columns: repeat(3, 1fr);
