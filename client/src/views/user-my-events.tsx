@@ -1,141 +1,44 @@
+import React, { useEffect, useState } from "react";
 import NavBar from "../components/navBar";
-import { dummyStudent } from "../constants/dummyStudent";
-import EventCardCarousel from "../components/eventCardCarousel";
-import { Event } from "../types/types";
-import "./styles/UserMyEvents.css";
 import EventCard from "../components/eventCard";
+import EventCardCarousel from "../components/eventCardCarousel";
 import EventCardGrid from "../components/eventCardGrid";
-import { useState, useEffect } from "react";
-import { getAllOpportunities } from "../utils/events-utils";
-import { getVolunteeredOpportunities } from "../utils/reserve-utils";
-import { getUserProfile } from "../utils/profile-utils"; 
-
-interface EventCardProps {
-    events: Event[];
-}
+import { dummyStudent } from "../constants/dummyStudent";
+import { Event, StudentProfile } from "../types/types";
+import { getJoinedEventIds, getProfile, getUpcomingEvents } from "../utils/api";
+import { splitPastAndUpcoming } from "../utils/time";
+import "./styles/UserMyEvents.css";
 
 function MyEvents() {
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [events, setEvents] = useState<Event[]>([]);
-  const [userData, setUserData] = useState<any>(null);
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        //Use the working profile endpoint instead of /api/me
-        try {
-          const profileData = await getUserProfile();
-          console.log("MyEvents - Profile data received:", profileData);
-          setUserData(profileData);
-        } catch (profileError) {
-          console.error("MyEvents - Error fetching profile:", profileError);
-          setUserData(null);
-        }
+        setProfile((await getProfile()) as StudentProfile);
+      } catch {
+        setProfile(null);
+      }
 
-        // Get all opportunities (like landing page does)
-        const allOpportunities = await getAllOpportunities();
-        
-        // Get list of opportunity IDs the user has volunteered for
-        const volunteeredList = await getVolunteeredOpportunities(); // Returns just signup info
-        const volunteeredIds = volunteeredList.map((v: any) => v.id || v.opportunity_id);
-        
-        // Filter all opportunities to only show ones user signed up for
-        const userEvents = allOpportunities.filter((event: any) => 
-          volunteeredIds.includes(event.id)
-        );
-        
-        console.log('All opportunities:', allOpportunities);
-        console.log('Volunteered IDs:', volunteeredIds);
-        console.log('User events:', userEvents);
-        
-        setEvents(userEvents);
+      try {
+        const [upcoming, joinedIds] = await Promise.all([getUpcomingEvents(), getJoinedEventIds()]);
+        setEvents(upcoming.filter((event) => joinedIds.includes(event.id)));
       } catch (error) {
         console.error('Error fetching student events:', error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
   }, []);
-
-  // Format time from military to 12-hour format
-  const formatTimeDisplay = (timeString: string) => {
-    if (!timeString) return 'Time TBD';
-    
-    try {
-      const [hours, minutes] = timeString.split(':').map(Number);
-      const period = hours >= 12 ? 'PM' : 'AM';
-      const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-      const displayMinutes = minutes.toString().padStart(2, '0');
-      return `${displayHours}:${displayMinutes} ${period}`;
-    } catch (error) {
-      return timeString;
-    }
-  };
-
-  // Format date consistently
-  const formatDateDisplay = (dateString: string) => {
-    if (!dateString) return 'Date TBD';
-    
-    try {
-      const [year, month, day] = dateString.split('-').map(Number);
-      const date = new Date(year, month - 1, day);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: 'numeric'
-      });
-    } catch (error) {
-      return dateString;
-    }
-  };
-
-  // Function to categorize events by date/time
-  const categorizeEvents = () => {
-    const currentDateTime = new Date();
-    const upcoming: Event[] = [];
-    const past: Event[] = [];
-    
-    events.forEach((event: Event) => {
-      try {
-        // Parse date without timezone conversion
-        const [year, month, day] = event.startDate.split('-').map(Number);
-        const eventDate = new Date(year, month - 1, day);
-        
-        // Use raw time for comparison
-        const timeToUse = event.rawTime || event.startTime;
-        const [hours, minutes] = timeToUse.split(':').map(Number);
-        eventDate.setHours(hours, minutes, 0, 0);
-        
-        // Compare the full datetime (date + time)
-        if (eventDate > currentDateTime) {
-          upcoming.push(event);
-        } else {
-          past.push(event);
-        }
-      } catch (error) {
-        console.error('Error parsing event date/time:', error);
-        // If date parsing fails, assume it's upcoming
-        upcoming.push(event);
-      }
-    });
-    
-    return { upcoming, past };
-  };
-  
-  // Filter events based on search query
-  const filteredEvents = events.filter(event =>
-    event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    event.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (event.organization && event.organization.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
 
   if (loading) {
     return (
       <>
-        <NavBar userType="student"/>
+        <NavBar userType="student" />
         <div className="loading-message">
           <p>Loading your events...</p>
         </div>
@@ -143,24 +46,30 @@ function MyEvents() {
     );
   }
 
-  // Get categorized events
-  const { upcoming: upcomingEvents, past: pastEvents } = categorizeEvents();
+  const query = searchQuery.toLowerCase();
+  const matchingEvents = events.filter(
+    (event) =>
+      event.title.toLowerCase().includes(query) ||
+      event.location.toLowerCase().includes(query) ||
+      (event.organization && event.organization.toLowerCase().includes(query))
+  );
+  const all = splitPastAndUpcoming(events);
+  const matching = splitPastAndUpcoming(matchingEvents);
 
-  return(
+  return (
     <>
-      <NavBar userType="student"/>
-      
+      <NavBar userType="student" />
+
       <div className="landing-page__content">
         <div className="landing-page-header">
           <h1 className="landing-page__greeting">
-            Hello, <span className="highlight">{userData?.full_name || dummyStudent.full_name}</span>
+            Hello, <span className="highlight">{profile?.full_name || dummyStudent.full_name}</span>
           </h1>
           <p className="landing-page__welcome">
             Here are <span className="highlight">your registered events</span>
           </p>
         </div>
 
-        {/* Search Bar */}
         <div className="search-bar-container">
           <input
             type="text"
@@ -174,22 +83,13 @@ function MyEvents() {
 
       <div className="landing-page-events">
         <h2 className="header-events">Upcoming Events You've Joined</h2>
-        <p className="number_of_events">You have {upcomingEvents.length} upcoming event{upcomingEvents.length !== 1 ? 's' : ''}</p>
-        {upcomingEvents.length > 0 ? (
-          <EventCardCarousel 
-            events={searchQuery ? filteredEvents.filter(e => {
-              try {
-                const [year, month, day] = e.startDate.split('-').map(Number);
-                const eventDate = new Date(year, month - 1, day);
-                const timeToUse = e.rawTime || e.startTime;
-                const [hours, minutes] = timeToUse.split(':').map(Number);
-                eventDate.setHours(hours, minutes, 0, 0);
-                return eventDate > new Date();
-              } catch {
-                return true;
-              }
-            }) : upcomingEvents} 
-            userType="student"  
+        <p className="number_of_events">
+          You have {all.upcoming.length} upcoming event{all.upcoming.length !== 1 ? 's' : ''}
+        </p>
+        {all.upcoming.length > 0 ? (
+          <EventCardCarousel
+            events={matching.upcoming}
+            userType="student"
             renderCard={(event, userType) => <EventCard event={event} userType={userType} />}
           />
         ) : (
@@ -205,22 +105,8 @@ function MyEvents() {
       </div>
 
       <div className="past-opportunities-grid">
-        {pastEvents.length > 0 ? (
-          <EventCardGrid 
-            events={searchQuery ? filteredEvents.filter(e => {
-              try {
-                const [year, month, day] = e.startDate.split('-').map(Number);
-                const eventDate = new Date(year, month - 1, day);
-                const timeToUse = e.rawTime || e.startTime;
-                const [hours, minutes] = timeToUse.split(':').map(Number);
-                eventDate.setHours(hours, minutes, 0, 0);
-                return eventDate <= new Date();
-              } catch {
-                return false;
-              }
-            }) : pastEvents} 
-            userType="student"
-          />
+        {all.past.length > 0 ? (
+          <EventCardGrid events={matching.past} userType="student" />
         ) : (
           <div className="empty-state">
             <p>No past events found.</p>
@@ -229,7 +115,7 @@ function MyEvents() {
         )}
       </div>
     </>
-  )
+  );
 }
 
 export default MyEvents;

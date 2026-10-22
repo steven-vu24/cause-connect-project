@@ -1,199 +1,105 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import NavBar from "../components/navBar";
-import { Event } from "../types/types";
 import EventCard from "../components/eventCard";
 import EventCardCarousel from "../components/eventCardCarousel";
-import { dummyStudent } from "../constants/dummyStudent";
-import "./styles/landing-page.css";
 import EventCardGrid from "../components/eventCardGrid";
-import { getAllOpportunities, getNearbyOpportunities } from "../utils/events-utils";
-import { getUserProfile } from "../utils/profile-utils";
+import { dummyStudent } from "../constants/dummyStudent";
+import { Event, StudentProfile } from "../types/types";
+import { getNearbyEvents, getProfile, getUpcomingEvents } from "../utils/api";
+import { sharesCause } from "../utils/causes";
+import { hasStarted } from "../utils/time";
+import "./styles/landing-page.css";
+
+const EXPLORE_LIMIT = 9;
+const emptyStateStyle = {
+  textAlign: 'center',
+  color: '#666',
+  margin: '20px 0',
+  padding: '20px',
+  backgroundColor: '#f9f9f9',
+  borderRadius: '8px',
+} as const;
+
+const notStarted = (events: Event[]) => events.filter((event) => !hasStarted(event));
 
 const LandingPage = () => {
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [userData, setUserData] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Location filtering state
-  const [currentLocation, setCurrentLocation] = useState<string>("");
-  const [selectedDistance, setSelectedDistance] = useState<string>("all");
+
+  const [currentLocation, setCurrentLocation] = useState("");
+  const [selectedDistance, setSelectedDistance] = useState("all");
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [locationDetected, setLocationDetected] = useState(false);
   const [locationManuallyChanged, setLocationManuallyChanged] = useState(false);
 
-  // Helper function to check if an event is in the future
-  const isEventInFuture = (event: Event) => {
-    try {
-      const currentDateTime = new Date();
-      
-      // Parse event date without timezone conversion
-      const [year, month, day] = event.startDate.split('-').map(Number);
-      const eventDate = new Date(year, month - 1, day);
-      
-      // Use raw time for comparison (use rawTime if available, otherwise parse startTime)
-      const timeToUse = event.rawTime || event.startTime;
-      if (!timeToUse) {
-        return false; // If no time, consider it past to be safe
-      }
-      
-      const [hours, minutes] = timeToUse.split(':').map(Number);
-      eventDate.setHours(hours, minutes, 0, 0);
-      
-      // Return true only if event datetime is in the future
-      return eventDate > currentDateTime;
-    } catch (error) {
-      console.error('Error checking if event is in future:', event, error);
-      return false; // If error parsing, consider it past to be safe
-    }
-  };
-
-  // Filter events to only show future events for students
-  const filterFutureEvents = (events: Event[]) => {
-    return events.filter(event => isEventInFuture(event));
-  };
-
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
-        
-        // Fetch user profile and get location from school field
-        try {
-          const profileData = await getUserProfile();
-          setUserData(profileData);
-          // Set location from user's school or default
-          const userLocation = profileData?.school || dummyStudent.school;
-          setCurrentLocation(userLocation);
-          setLocationDetected(!!profileData?.school);
-        } catch (profileError) {
-          console.error("Error fetching profile:", profileError);
-          setUserData(null);
-          setCurrentLocation(dummyStudent.school);
-          setLocationDetected(false);
-        }
+        const studentProfile = (await getProfile()) as StudentProfile;
+        setProfile(studentProfile);
+        setCurrentLocation(studentProfile.school || dummyStudent.school);
+        setLocationDetected(!!studentProfile.school);
+      } catch {
+        setProfile(null);
+        setCurrentLocation(dummyStudent.school);
+        setLocationDetected(false);
+      }
 
-        // Fetch all events initially
-        const eventsData = await getAllOpportunities();
-        
-        // Filter to only show future events for students
-        const futureEvents = filterFutureEvents(eventsData);
-        
-        setAllEvents(futureEvents);
-        setFilteredEvents(futureEvents);
-        
-      } catch (err: any) {
-        console.error("Error fetching data:", err);
-        setError(err.message);
+      try {
+        const events = notStarted(await getUpcomingEvents());
+        setAllEvents(events);
+        setFilteredEvents(events);
+      } catch (err) {
+        console.error("Error fetching events:", err);
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
   }, []);
 
-  // Effect to handle location-based filtering
   useEffect(() => {
-    const filterEventsByLocation = async () => {
-      if (!currentLocation || selectedDistance === "all") {
-        setFilteredEvents(allEvents);
-        return;
-      }
-
-      try {
-        setIsLoadingLocation(true);
-        const nearbyEvents = await getNearbyOpportunities(currentLocation, parseInt(selectedDistance));
-        
-        // Filter nearby events to only show future events for students
-        const futureNearbyEvents = filterFutureEvents(nearbyEvents);
-        
-        setFilteredEvents(futureNearbyEvents);
-      } catch (error) {
-        console.error("Error filtering events by location:", error);
-        // Fallback to all events if location filtering fails
-        setFilteredEvents(allEvents);
-      } finally {
-        setIsLoadingLocation(false);
-      }
-    };
-
-    if (currentLocation && allEvents.length > 0) {
-      filterEventsByLocation();
+    if (!currentLocation || allEvents.length === 0) return;
+    if (selectedDistance === "all") {
+      setFilteredEvents(allEvents);
+      return;
     }
+
+    setIsLoadingLocation(true);
+    getNearbyEvents(currentLocation, parseInt(selectedDistance))
+      .then((nearby) => setFilteredEvents(notStarted(nearby)))
+      .catch(() => setFilteredEvents(allEvents))
+      .finally(() => setIsLoadingLocation(false));
   }, [currentLocation, selectedDistance, allEvents]);
-
-  // Helper function to check if student interests match organization causes
-  const getInterestMatchedEvents = (events: Event[], studentInterests: string) => {
-    if (!studentInterests || !studentInterests.trim()) {
-      return [];
-    }
-    
-    // Convert student interests string to array and clean up
-    const studentInterestArray = studentInterests
-      .split(',')
-      .map(interest => interest.trim().toLowerCase())
-      .filter(interest => interest.length > 0);
-    
-    if (studentInterestArray.length === 0) {
-      return [];
-    }
-    
-    const matchedEvents = events.filter(event => {
-      // Get event causes - now properly populated from backend JOIN
-      const eventCauses = event.cause ? 
-        event.cause.split(',').map(cause => cause.trim().toLowerCase()) : 
-        [];
-      
-      // Check if at least one student interest matches one event cause
-      const hasMatch = studentInterestArray.some(interest => 
-        eventCauses.some(cause => {
-          // Check for exact match or partial match
-          return cause.includes(interest) || 
-                 interest.includes(cause) ||
-                 cause === interest;
-        })
-      );
-      
-      return hasMatch;
-    });
-    
-    return matchedEvents;
-  };
 
   const handleLocationChange = (newLocation: string) => {
     setCurrentLocation(newLocation);
-    setLocationDetected(false); // User manually changed location
-    setLocationManuallyChanged(true); // Track that user changed location manually
+    setLocationDetected(false);
+    setLocationManuallyChanged(true);
   };
 
-  const handleDistanceChange = (distance: string) => {
-    setSelectedDistance(distance);
-  };
-
-  // Filter events based on search query (from location-filtered events)
-  const searchFilteredEvents = filteredEvents.filter(event =>
-    event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    event.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (event.organization && event.organization.toLowerCase().includes(searchQuery.toLowerCase()))
+  const query = searchQuery.toLowerCase();
+  const searchFilteredEvents = filteredEvents.filter(
+    (event) =>
+      event.title.toLowerCase().includes(query) ||
+      event.location.toLowerCase().includes(query) ||
+      (event.organization && event.organization.toLowerCase().includes(query))
   );
 
-  // Get interest-matched events from location-filtered events
-  const interestMatchedEvents = userData?.interests ? 
-    getInterestMatchedEvents(filteredEvents, userData.interests) : 
-    [];
+  const interestMatchedEvents = profile?.interests
+    ? filteredEvents.filter((event) => sharesCause(profile.interests, event.cause))
+    : [];
 
-  // For explore section: show only first 9 events if no search, all filtered if searching
-  const exploreEvents = searchQuery.trim() 
-    ? searchFilteredEvents // Show all matching results when searching
-    : searchFilteredEvents.slice(0, 9); // Limit to 9 when not searching
+  const exploreEvents = searchQuery.trim() ? searchFilteredEvents : searchFilteredEvents.slice(0, EXPLORE_LIMIT);
+  const distanceSuffix = selectedDistance !== 'all' ? ` within ${selectedDistance} miles` : '';
 
   if (loading) {
     return (
       <div className="landing-page">
-        <NavBar userType="student"/>
+        <NavBar userType="student" />
         <div className="landing-page__content">
           <p>Loading...</p>
         </div>
@@ -203,11 +109,11 @@ const LandingPage = () => {
 
   return (
     <div className="landing-page">
-      <NavBar userType="student"/>
+      <NavBar userType="student" />
       <div className="landing-page__content">
         <div className="landing-page-header">
           <h1 className="landing-page__greeting">
-            Hello, <span className="highlight">{userData?.full_name || dummyStudent.full_name}</span>
+            Hello, <span className="highlight">{profile?.full_name || dummyStudent.full_name}</span>
           </h1>
           <p className="landing-page__welcome">
             Welcome back to <span className="highlight"> your</span> platform for{" "}
@@ -217,7 +123,6 @@ const LandingPage = () => {
           </p>
         </div>
 
-        {/* Location Filter */}
         <div className="location-filter-container">
           <div className="location-filter">
             <div className="location-info">
@@ -227,26 +132,26 @@ const LandingPage = () => {
                 {locationDetected ? '(detected)' : locationManuallyChanged ? '(custom)' : '(default)'}
               </span>
             </div>
-            
+
             <div className="location-controls">
               <input
                 type="text"
                 placeholder="Change location..."
                 className="location-input"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    const newLocation = (e.target as HTMLInputElement).value.trim();
-                    if (newLocation) {
-                      handleLocationChange(newLocation);
-                      (e.target as HTMLInputElement).value = '';
-                    }
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  const input = e.target as HTMLInputElement;
+                  const newLocation = input.value.trim();
+                  if (newLocation) {
+                    handleLocationChange(newLocation);
+                    input.value = '';
                   }
                 }}
               />
-              
-              <select 
-                value={selectedDistance} 
-                onChange={(e) => handleDistanceChange(e.target.value)}
+
+              <select
+                value={selectedDistance}
+                onChange={(e) => setSelectedDistance(e.target.value)}
                 className="distance-select"
               >
                 <option value="all">All Events</option>
@@ -256,14 +161,13 @@ const LandingPage = () => {
                 <option value="50">Within 50 miles</option>
               </select>
             </div>
-            
+
             <div className="filter-status">
               {isLoadingLocation ? (
                 <span>Loading...</span>
               ) : (
                 <span>
-                  {filteredEvents.length} upcoming events found
-                  {selectedDistance !== 'all' && ` within ${selectedDistance} miles`}
+                  {filteredEvents.length} upcoming events found{distanceSuffix}
                 </span>
               )}
             </div>
@@ -272,28 +176,27 @@ const LandingPage = () => {
 
         <div className="landing-page-events">
           <h2 className="header-events">Dive Deeper into your Interests</h2>
-          {userData?.interests ? (
+          {profile?.interests ? (
             <>
               <p style={{ margin: '10px 0', fontSize: '14px', textAlign: 'center', color: 'black', fontStyle: "italic" }}>
-                Upcoming events from organizations matching your interests: <strong>{userData.interests}</strong>
+                Upcoming events from organizations matching your interests: <strong>{profile.interests}</strong>
                 {selectedDistance !== 'all' && ` (within ${selectedDistance} miles)`}
               </p>
-              {/*Events count bar */}
               <p className="number_of_events">
                 You have {interestMatchedEvents.length} upcoming event{interestMatchedEvents.length !== 1 ? 's' : ''} matching your interests
-                {selectedDistance !== 'all' && ` within ${selectedDistance} miles`}
+                {distanceSuffix}
               </p>
               {isLoadingLocation ? (
                 <p>Loading events...</p>
               ) : interestMatchedEvents.length > 0 ? (
-                <EventCardCarousel 
-                  events={interestMatchedEvents} 
-                  userType="student"  
+                <EventCardCarousel
+                  events={interestMatchedEvents}
+                  userType="student"
                   renderCard={(event, userType) => <EventCard event={event} userType={userType} />}
                 />
               ) : (
-                <div style={{ textAlign: 'center', color: '#666', margin: '20px 0', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-                  <p>No upcoming events found from organizations matching your current interests{selectedDistance !== 'all' && ` within ${selectedDistance} miles`}.</p>
+                <div style={emptyStateStyle}>
+                  <p>No upcoming events found from organizations matching your current interests{distanceSuffix}.</p>
                   {selectedDistance !== 'all' ? (
                     <p>Try increasing your distance range or check out the "Explore New Causes" section below!</p>
                   ) : (
@@ -303,7 +206,7 @@ const LandingPage = () => {
               )}
             </>
           ) : (
-            <div style={{ textAlign: 'center', color: '#666', margin: '20px 0', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+            <div style={emptyStateStyle}>
               <p>Complete your profile to see personalized event recommendations!</p>
               <p>Visit your profile page to add your interests.</p>
             </div>
@@ -323,32 +226,28 @@ const LandingPage = () => {
             />
           </div>
 
-          {/* Show search results info */}
           {searchQuery.trim() && (
             <p style={{ margin: '10px 0', color: '#666', textAlign: 'center' }}>
               {exploreEvents.length} upcoming event{exploreEvents.length !== 1 ? 's' : ''} found for "{searchQuery}"
-              {selectedDistance !== 'all' && ` within ${selectedDistance} miles`}
+              {distanceSuffix}
             </p>
           )}
 
-          {/* Show limited events or search results - WITH LOCATION FILTERING */}
           {isLoadingLocation ? (
             <p style={{ textAlign: 'center', margin: '20px 0' }}>Loading events...</p>
           ) : (
-            <EventCardGrid events={exploreEvents} userType="student"/>
+            <EventCardGrid events={exploreEvents} userType="student" />
           )}
-          
-          {/* Show message when not searching and there are more events */}
-          {!searchQuery.trim() && !isLoadingLocation && searchFilteredEvents.length > 9 && (
+
+          {!searchQuery.trim() && !isLoadingLocation && searchFilteredEvents.length > EXPLORE_LIMIT && (
             <p style={{ margin: '20px 0', color: '#666', textAlign: 'center', fontStyle: 'italic' }}>
-              Showing 9 of {searchFilteredEvents.length} upcoming events{selectedDistance !== 'all' && ` within ${selectedDistance} miles`}. Use the search bar to find specific events.
+              Showing {EXPLORE_LIMIT} of {searchFilteredEvents.length} upcoming events{distanceSuffix}. Use the search bar to find specific events.
             </p>
           )}
-          
-          {/* Show message when no upcoming events are available */}
+
           {!isLoadingLocation && exploreEvents.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#666', margin: '20px 0', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-              <p>No upcoming events available{selectedDistance !== 'all' && ` within ${selectedDistance} miles`}.</p>
+            <div style={emptyStateStyle}>
+              <p>No upcoming events available{distanceSuffix}.</p>
               {selectedDistance !== 'all' && <p>Try increasing your distance range to see more events!</p>}
             </div>
           )}

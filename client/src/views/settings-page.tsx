@@ -1,22 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "./styles/settingsPage.css";
 import NavBar from "../components/navBar";
-import { useNavigate } from 'react-router-dom';
-import { getUserProfile } from '../utils/profile-utils';
-import { getSession } from '../utils/user-utils';
-
-interface UserProfile {
-  full_name?: string;
-  email?: string;
-  age?: number;
-  school?: string;
-  bio?: string;
-  interests?: string;
-  nonprofit_name?: string;
-  location?: string;
-  category?: string;
-  statement?: string;
-}
+import { NonprofitProfile, StudentProfile, UserType } from "../types/types";
+import { getProfile, getSession, updateAccount } from "../utils/api";
 
 interface AccountSettingsData {
   email: string;
@@ -26,12 +12,11 @@ interface AccountSettingsData {
 }
 
 const SettingsPage = () => {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('account');
   const [loading, setLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [userType, setUserType] = useState<"student" | "organization">("student");
-  const [sessionEmail, setSessionEmail] = useState<string>('');
+  const [userProfile, setUserProfile] = useState<Partial<StudentProfile & NonprofitProfile> | null>(null);
+  const [userType, setUserType] = useState<UserType>("student");
+  const [sessionEmail, setSessionEmail] = useState('');
 
   const [formData, setFormData] = useState<AccountSettingsData>({
     email: '',
@@ -43,107 +28,66 @@ const SettingsPage = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        setLoading(true);
-        
-        // Get session data first
-        const sessionData = await getSession();
-        if (sessionData?.email) {
-          setSessionEmail(sessionData.email);
-          setFormData(prev => ({ ...prev, email: sessionData.email }));
+        const session = await getSession();
+        if (session?.email) {
+          setSessionEmail(session.email);
+          setFormData((prev) => ({ ...prev, email: session.email }));
         }
 
-        // Get user profile
-        const profile = await getUserProfile();
+        const profile = await getProfile();
         setUserProfile(profile);
-        
-        // Determine user type based on profile data
-        const isStudent = 'full_name' in profile;
-        setUserType(isStudent ? 'student' : 'organization');
-        
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-        // If profile doesn't exist, that's ok - user can create one
+        setUserType('full_name' in profile ? 'student' : 'nonprofit');
+      } catch {
+        // Accounts without a profile yet can still change their settings.
       } finally {
         setLoading(false);
       }
     };
-
     fetchUserData();
   }, []);
 
   const handleAccountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleAccountSave = async () => {
-    try {
-      // Validate passwords if changing password
-      if (formData.newPassword) {
-        if (formData.newPassword !== formData.confirmPassword) {
-          alert("New passwords do not match.");
-          return;
-        }
-        if (!formData.currentPassword) {
-          alert("Current password is required to set a new password.");
-          return;
-        }
-        if (formData.newPassword.length < 8) {
-          alert("New password must be at least 8 characters long.");
-          return;
-        }
-      }
-
-      // Create request payload
-      const updateData: any = {};
-      
-      // Only include email if it's different from session email
-      if (formData.email !== sessionEmail) {
-        updateData.email = formData.email;
-      }
-      
-      // Only include password fields if changing password
-      if (formData.newPassword) {
-        updateData.currentPassword = formData.currentPassword;
-        updateData.newPassword = formData.newPassword;
-      }
-
-      // If no changes, don't make request
-      if (Object.keys(updateData).length === 0) {
-        alert('No changes to save.');
+    if (formData.newPassword) {
+      if (formData.newPassword !== formData.confirmPassword) {
+        alert("New passwords do not match.");
         return;
       }
-
-      const response = await fetch('http://localhost:5001/api/account/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(updateData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update account settings.');
+      if (!formData.currentPassword) {
+        alert("Current password is required to set a new password.");
+        return;
       }
+      if (formData.newPassword.length < 8) {
+        alert("New password must be at least 8 characters long.");
+        return;
+      }
+    }
 
+    const changes: { email?: string; currentPassword?: string; newPassword?: string } = {};
+    if (formData.email !== sessionEmail) changes.email = formData.email;
+    if (formData.newPassword) {
+      changes.currentPassword = formData.currentPassword;
+      changes.newPassword = formData.newPassword;
+    }
+    if (Object.keys(changes).length === 0) {
+      alert('No changes to save.');
+      return;
+    }
+
+    try {
+      await updateAccount(changes);
       alert('Account settings updated successfully!');
-      // Clear password fields
-      setFormData(prev => ({
-        ...prev,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      }));
+      setFormData((prev) => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
     } catch (error) {
-      console.error('Update error:', error);
       alert(`Error updating settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const handleCancelAccount = () => {
-    // Reset account form to original values
     setFormData({
       email: sessionEmail,
       currentPassword: '',
@@ -153,7 +97,6 @@ const SettingsPage = () => {
   };
 
   const handleCancelSecurity = () => {
-    // Reset password fields
     setFormData(prev => ({
       ...prev,
       currentPassword: '',
@@ -180,14 +123,12 @@ const SettingsPage = () => {
       <NavBar userType={userType} />
       <div className="settings-page">
         <div className="settings-container">
-          {/* Header */}
           <div className="settings-header">
             <h1 className="settings-title">Settings</h1>
             <p className="settings-subtitle">Manage your account and security settings</p>
           </div>
 
           <div className="settings-content">
-            {/* Left Sidebar */}
             <div className="settings-sidebar">
               <div className="profile-section">
                 <div className="profile-info">
@@ -219,7 +160,6 @@ const SettingsPage = () => {
               </nav>
             </div>
 
-            {/* Main Content */}
             <div className="settings-main">
               {activeTab === 'account' && (
                 <div className="settings-section">
@@ -240,7 +180,6 @@ const SettingsPage = () => {
                     />
                   </div>
 
-                  {/* Email Change Disclaimer */}
                   <div className="email-disclaimer">
                     <div className="info-card">
                       <h4>⚠️ Important Notice</h4>

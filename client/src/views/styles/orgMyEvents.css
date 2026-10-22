@@ -1,4 +1,3 @@
-/* Keep your existing search styles but add centered version */
 .search-container {
   margin: 20px 0;
   padding: 0 20px;
@@ -26,37 +25,32 @@
   border-color: #4CAF50;
 }
 
-/* Original events section styles */
 .events-section {
   margin: 40px 20px;
 }
 
-/* Split layout container */
 .events-split-container {
   display: flex;
   gap: 20px;
   margin: 40px 20px;
-  height: 80vh; /* Set fixed height for the container */
-  min-height: 600px; /* Ensure minimum height */
+  height: 80vh;
+  min-height: 600px;
 }
 
-/* Each half section */
 .events-section-half {
   flex: 1;
   padding: 20px;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Prevent overflow from the container */
+  overflow: hidden;
 }
 
-/* Past events section with gray tint */
 .past-events-section {
   background-color: #f8f9fa;
   border: 1px solid #e9ecef;
 }
 
-/* Upcoming events section */
 .upcoming-events-section {
   background-color: #ffffff;
   border: 1px solid #e0e0e0;
@@ -67,26 +61,25 @@
   font-weight: 600;
   color: #333;
   margin-bottom: 8px;
-  flex-shrink: 0; /* Prevent title from shrinking */
+  flex-shrink: 0;
 }
 
 .events-count {
   color: #666;
   font-size: 16px;
   margin-bottom: 24px;
-  flex-shrink: 0; /* Prevent count from shrinking */
+  flex-shrink: 0;
 }
 
 .events-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  overflow-y: auto; /* Add vertical scrolling */
-  flex: 1; /* Take remaining space */
+  overflow-y: auto;
+  flex: 1;
   padding-right: 8px; /* Space for scrollbar */
 }
 
-/* Custom scrollbar styling */
 .events-list::-webkit-scrollbar {
   width: 8px;
 }
@@ -111,7 +104,7 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   transition: box-shadow 0.3s ease;
-  flex-shrink: 0; /* Prevent event items from shrinking */
+  flex-shrink: 0;
 }
 
 .event-item:hover {
@@ -138,7 +131,7 @@
 
 .event-info {
   flex: 1;
-  min-width: 0; /* Allow text to wrap properly */
+  min-width: 0;
 }
 
 .event-title {
@@ -146,8 +139,8 @@
   font-weight: 600;
   color: #333;
   margin: 0 0 8px 0;
-  word-wrap: break-word; /* Break long words */
-  overflow-wrap: break-word; /* Break long words */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .event-details {
@@ -171,15 +164,15 @@
 .event-location {
   color: #666;
   font-size: 14px;
-  word-wrap: break-word; /* Break long location names */
-  overflow-wrap: break-word; /* Break long location names */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .event-stats {
   display: flex;
   align-items: center;
   gap: 16px;
-  flex-shrink: 0; /* Prevent stats from shrinking */
+  flex-shrink: 0;
 }
 
 .volunteer-count {
@@ -189,7 +182,7 @@
   border-radius: 20px;
   font-size: 14px;
   font-weight: 500;
-  white-space: nowrap; /* Prevent wrapping */
+  white-space: nowrap;
 }
 
 .expand-icon {
@@ -202,11 +195,10 @@
   padding: 0 20px 20px 20px;
   border-top: 1px solid #f0f0f0;
   background-color: #fafafa;
-  max-height: 300px; /* Limit height of volunteer list */
-  overflow-y: auto; /* Add scrolling for long volunteer lists */
+  max-height: 300px;
+  overflow-y: auto;
 }
 
-/* Custom scrollbar for volunteers list */
 .volunteers-list::-webkit-scrollbar {
   width: 6px;
 }
@@ -250,8 +242,8 @@
   font-weight: 500;
   color: #333;
   font-size: 16px;
-  word-wrap: break-word; /* Break long names */
-  overflow-wrap: break-word; /* Break long names */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
   flex: 1;
   margin-right: 12px;
 }
@@ -260,7 +252,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-shrink: 0; /* Prevent actions from shrinking */
+  flex-shrink: 0;
 }
 
 .remove-volunteer-btn {
@@ -297,8 +289,8 @@
   margin-bottom: 8px;
   font-size: 14px;
   line-height: 1.4;
-  word-wrap: break-word; /* Break long content */
-  overflow-wrap: break-word; /* Break long content */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .detail-row strong {
@@ -326,18 +318,17 @@
   justify-content: center;
 }
 
-/* Responsive design */
 @media (max-width: 1024px) {
   .events-split-container {
     flex-direction: column;
     gap: 20px;
     margin: 40px 20px;
-    height: auto; /* Remove fixed height on mobile */
+    height: auto;
   }
   
   .events-section-half {
-    min-height: 400px; /* Set minimum height for mobile */
-    max-height: 60vh; /* Limit maximum height on mobile */
+    min-height: 400px;
+    max-height: 60vh;
   }
 }
 
@@ -348,8 +339,8 @@
   
   .events-section-half {
     padding: 15px;
-    min-height: 300px; /* Smaller minimum height for small screens */
-    max-height: 50vh; /* Smaller maximum height for small screens */
+    min-height: 300px;
+    max-height: 50vh;
   }
   
   .event-header {
@@ -381,6 +372,6 @@
   }
   
   .volunteers-list {
-    max-height: 200px; /* Smaller max height for mobile */
+    max-height: 200px;
   }
 }

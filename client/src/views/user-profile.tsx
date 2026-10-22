@@ -1,178 +1,58 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "./styles/userProfile.css";
 import avatar from "../default-avatar.png";
 import NavBar from "../components/navBar";
-import { getUserProfile, updateUserProfile } from "../utils/profile-utils";
+import CauseSelect from "../components/causeSelect";
+import { StudentProfile } from "../types/types";
+import { getMe, saveProfile } from "../utils/api";
+import { joinCauses, parseCauses } from "../utils/causes";
 import { createAvatarFromName } from "../utils/profile-pic-utils";
 
-interface StudentProfile {
-  full_name: string;
-  age: number;
-  school: string;
-  bio: string;
-  interests: string;
-}
-
-interface UserData {
-  email: string;
-  profile: StudentProfile;
-}
+const emptyProfile: StudentProfile = { full_name: '', age: 0, school: '', bio: '', interests: '' };
 
 function UserProfile() {
-  const [imageUrl, setImageUrl] = useState(avatar);
-  const [editMode, setEditMode] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [formData, setFormData] = useState<StudentProfile>(emptyProfile);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  
-  // User data state
-  const [userData, setUserData] = useState<UserData | null>(null);
+  const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  
-  // Form data state for editing
-  const [formData, setFormData] = useState({
-    full_name: '',
-    age: 0,
-    school: '', // location
-    bio: '',
-    interests: ''
-  });
+  const [error, setError] = useState<string | null>(null);
 
-  const availableInterests = [
-  "Animals", "Children & Youth", "Cultural & Education", "Disabilities", "Disaster Relief", "Elderly",
-              "Environment", "Global – Local Based", "Health & Disease", "Homeless", "Hunger & Poverty",
-              "International", "Military Charities", "Racial Equality", "Service & Benevolence Clubs", "Women's Issues", 
-              "Sports", "Music/Art", "Engineering", "Mathematics", "Science", "Social Justice"
-];
-
-  // Fetch user profile data on component mount
   useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Helper function for API calls (same as in NavBar)
-        const makeRequest = async (url: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', data?: any) => {
-          const headers: HeadersInit = {
-            'Content-Type': 'application/json',
-          };
-
-          const requestOptions: RequestInit = {
-            method,
-            headers,
-            credentials: 'include', 
-            body: data ? JSON.stringify(data) : undefined,
-          };
-
-          const response = await fetch(url, requestOptions);
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'An error occurred');
-          }
-          return await response.json();
-        };
-
-        const API_BASE = "http://localhost:5001/api";
-        
-        const data = await makeRequest(`${API_BASE}/me`, 'GET');
-        console.log('User data received:', data);
-        
-        if (data && data.profile) {
-          // Set the user data with both email and profile
-          setUserData({
-            email: data.email,
-            profile: data.profile
-          });
-          
-          // Set form data for editing
-          setFormData({
-            full_name: data.profile.full_name || '',
-            age: data.profile.age || 0,
-            school: data.profile.school || '',
-            bio: data.profile.bio || '',
-            interests: data.profile.interests || ''
-          });
-          
-          // Set selected interests
-          if (data.profile.interests) {
-            setSelectedInterests(data.profile.interests.split(", "));
-          }
-
-          // Set dynamic avatar based on user name
-          if (data.profile.full_name) {
-            const dynamicAvatar = createAvatarFromName(data.profile.full_name);
-            setImageUrl(dynamicAvatar);
-          }
-        } else {
+    getMe<StudentProfile>()
+      .then((me) => {
+        if (!me.profile) {
           setError('No profile data found');
+          return;
         }
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-        setError('Failed to load profile data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserData();
+        setEmail(me.email);
+        setProfile(me.profile);
+        setFormData({ ...emptyProfile, ...me.profile });
+        setSelectedInterests(parseCauses(me.profile.interests));
+      })
+      .catch(() => setError('Failed to load profile data'))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Update profile picture when name changes
-  useEffect(() => {
-    if (formData.full_name) {
-      const dynamicAvatar = createAvatarFromName(formData.full_name);
-      setImageUrl(dynamicAvatar);
-    }
-  }, [formData.full_name]);
+  const toggleInterest = (interest: string) =>
+    setSelectedInterests((prev) =>
+      prev.includes(interest) ? prev.filter((item) => item !== interest) : [...prev, interest]
+    );
 
-  // Update selected interests when they change
-  useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      interests: selectedInterests.join(", ")
-    }));
-  }, [selectedInterests]);
+  const handleInputChange = (field: keyof StudentProfile, value: string | number) =>
+    setFormData((prev) => ({ ...prev, [field]: value }));
 
-  // Interest toggling functionality
-  const toggleInterest = (interest: string) => {
-    if (selectedInterests.includes(interest)) {
-      setSelectedInterests(selectedInterests.filter(item => item !== interest));
-    } else {
-      setSelectedInterests([...selectedInterests, interest]);
-    }
-  };
-
-  const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  // Handle saving changes
   const saveChanges = async () => {
+    const updated = { ...formData, interests: joinCauses(selectedInterests) };
+    setSaving(true);
+    setError(null);
     try {
-      setSaving(true);
-      setError(null);
-      
-      await updateUserProfile(formData);
-      
-      // Update local state with new data
-      if (userData) {
-        setUserData({
-          ...userData,
-          profile: {
-            ...userData.profile,
-            ...formData
-          }
-        });
-      }
-      
+      await saveProfile(updated);
+      setProfile(updated);
       setEditMode(false);
-      console.log('Profile updated successfully');
-    } catch (error) {
-      console.error('Error saving profile:', error);
+    } catch {
       setError('Failed to save changes. Please try again.');
     } finally {
       setSaving(false);
@@ -180,14 +60,10 @@ function UserProfile() {
   };
 
   const handleEditToggle = () => {
-    if (editMode && !saving) {
-      saveChanges();
-    } else if (!editMode) {
-      setEditMode(true);
-    }
+    if (!editMode) setEditMode(true);
+    else if (!saving) saveChanges();
   };
 
-  // Show loading state
   if (loading) {
     return (
       <>
@@ -199,8 +75,7 @@ function UserProfile() {
     );
   }
 
-  // Show error state
-  if (error && !userData) {
+  if (error && !profile) {
     return (
       <>
         <NavBar userType="student" />
@@ -211,55 +86,47 @@ function UserProfile() {
     );
   }
 
-  // Use real data or fallback
-  const displayData = userData?.profile || {
+  const displayData = profile || {
     full_name: 'Unknown User',
     age: 0,
     school: 'Unknown Location',
     bio: 'No bio available',
-    interests: 'No interests listed'
+    interests: 'No interests listed',
   };
+  const imageUrl = formData.full_name ? createAvatarFromName(formData.full_name) : avatar;
 
   return (
     <>
       <NavBar userType="student" />
       <div className="user-profile">
-        {/* Left section with profile picture and name */}
         <div className="left-container">
           <div className="profile-pic-container">
             <img src={imageUrl} alt="Profile" className="user-profile-profile-pic" />
           </div>
 
           <div>
-            <span className="username">
-              {displayData.full_name}'s profile page
-            </span>
+            <span className="username">{displayData.full_name}'s profile page</span>
           </div>
 
-          <button 
-            className="edit-profile-btn"
-            onClick={handleEditToggle}
-            disabled={saving}
-          >
+          <button className="edit-profile-btn" onClick={handleEditToggle} disabled={saving}>
             {saving ? "Saving..." : editMode ? "Save Profile" : "Edit Profile"}
           </button>
-          
-          {error && <div className="error-message" style={{marginTop: '10px', color: 'red'}}>{error}</div>}
+
+          {error && <div className="error-message" style={{ marginTop: '10px', color: 'red' }}>{error}</div>}
         </div>
 
-        {/* Right section with profile details */}
         <div className="right-container">
           <h2 className="section-title">Profile Information</h2>
-          
+
           <div className="info-grid">
             <div className="info-item">
               <h2 className="info-label">
                 <span className="info-icon">👤</span> Name
               </h2>
               {editMode ? (
-                <input 
-                  type="text" 
-                  className="info-input" 
+                <input
+                  type="text"
+                  className="info-input"
                   value={formData.full_name}
                   onChange={(e) => handleInputChange('full_name', e.target.value)}
                 />
@@ -273,14 +140,9 @@ function UserProfile() {
                 <span className="info-icon">✉️</span> Email
               </h2>
               {editMode ? (
-                <input 
-                  type="email" 
-                  className="info-input" 
-                  value={userData?.email || ""}
-                  disabled // Email shouldn't be editable from profile
-                />
+                <input type="email" className="info-input" value={email || ""} disabled />
               ) : (
-                <p className="user-info">{userData?.email || "No email"}</p>
+                <p className="user-info">{email || "No email"}</p>
               )}
             </div>
 
@@ -289,9 +151,9 @@ function UserProfile() {
                 <span className="info-icon">🎂</span> Age
               </h2>
               {editMode ? (
-                <input 
-                  type="number" 
-                  className="info-input" 
+                <input
+                  type="number"
+                  className="info-input"
                   value={formData.age}
                   onChange={(e) => handleInputChange('age', parseInt(e.target.value) || 0)}
                 />
@@ -305,9 +167,9 @@ function UserProfile() {
                 <span className="info-icon">💼</span> Location
               </h2>
               {editMode ? (
-                <input 
-                  type="text" 
-                  className="info-input" 
+                <input
+                  type="text"
+                  className="info-input"
                   value={formData.school}
                   onChange={(e) => handleInputChange('school', e.target.value)}
                 />
@@ -321,41 +183,9 @@ function UserProfile() {
                 <span className="info-icon">❤️</span> Interests
               </h2>
               {editMode ? (
-                  <div className="interests-dropdown-container">
-                  <div className="selected-interests">
-                    {selectedInterests.map((interest, index) => (
-                      <span key={index} className="selected-interest">
-                        {interest}
-                        <span 
-                          className="remove-interest" 
-                          onClick={() => toggleInterest(interest)}
-                        >
-                          ×
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="interests-dropdown">
-                    <div className="dropdown-label">
-                      Add interests <span className="dropdown-arrow">▼</span>
-                    </div>
-                    <div className="dropdown-options">
-                      {availableInterests
-                        .filter(interest => !selectedInterests.includes(interest))
-                        .map((interest, index) => (
-                          <div 
-                            key={index} 
-                            className="dropdown-option"
-                            onClick={() => toggleInterest(interest)}
-                          >
-                            {interest}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
+                <CauseSelect selected={selectedInterests} onToggle={toggleInterest} />
               ) : (
-                <p className="user-info">{selectedInterests.join(", ") || displayData.interests}</p>
+                <p className="user-info">{joinCauses(selectedInterests) || displayData.interests}</p>
               )}
             </div>
 
@@ -364,8 +194,8 @@ function UserProfile() {
                 <span className="info-icon">📝</span> Bio
               </h2>
               {editMode ? (
-                <textarea 
-                  className="bio-input" 
+                <textarea
+                  className="bio-input"
                   value={formData.bio}
                   onChange={(e) => handleInputChange('bio', e.target.value)}
                 />
@@ -376,7 +206,7 @@ function UserProfile() {
           </div>
         </div>
       </div>
-      </>
+    </>
   );
 }
 

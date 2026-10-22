@@ -1,163 +1,117 @@
+import React, { useEffect, useState } from "react";
 import NavBar from "../components/navBar";
-import { Event, Student } from "../types/types";
-import "./styles/orgMyEvents.css";
-import { useState, useEffect } from "react";
 import { dummyOrganization } from "../constants/dummyOrgs";
-import { getUserOpportunities, getOrganizationProfile, getEventVolunteers, removeVolunteerFromEvent } from "../utils/events-utils";
+import { Event, NonprofitProfile, Volunteer } from "../types/types";
+import { getEventVolunteers, getMyOpportunities, getNonprofitProfile, removeVolunteer } from "../utils/api";
+import { formatDate, formatTime, splitPastAndUpcoming } from "../utils/time";
+import "./styles/orgMyEvents.css";
 
-interface EventWithVolunteers extends Event {
-  volunteers: Student[];
+type EventWithVolunteers = Event & { volunteers: Volunteer[] };
+
+interface VolunteerRowProps {
+  volunteer: Volunteer;
+  expanded: boolean;
+  onToggle: () => void;
+  onRemove?: () => void;
 }
 
+const VolunteerRow = ({ volunteer, expanded, onToggle, onRemove }: VolunteerRowProps) => (
+  <div className="volunteer-item">
+    <div className="volunteer-basic-info" onClick={onToggle}>
+      <span className="volunteer-name">{volunteer.full_name}</span>
+      {onRemove ? (
+        <div className="volunteer-actions">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="remove-volunteer-btn"
+            title="Remove volunteer"
+          >
+            ✕
+          </button>
+          <span className="expand-volunteer-icon">{expanded ? '▼' : '▶'}</span>
+        </div>
+      ) : (
+        <span className="expand-volunteer-icon">{expanded ? '▼' : '▶'}</span>
+      )}
+    </div>
+
+    {expanded && (
+      <div className="volunteer-details">
+        <div className="detail-row">
+          <strong>Age:</strong> {volunteer.age}
+        </div>
+        <div className="detail-row">
+          <strong>Location:</strong> {volunteer.school}
+        </div>
+        <div className="detail-row">
+          <strong>Email:</strong> {volunteer.email}
+        </div>
+        {volunteer.bio && (
+          <div className="detail-row">
+            <strong>Bio:</strong> {volunteer.bio}
+          </div>
+        )}
+        {volunteer.interests && (
+          <div className="detail-row">
+            <strong>Interests:</strong> {volunteer.interests}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+);
+
 function OrgMyEvents() {
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [events, setEvents] = useState<EventWithVolunteers[]>([]);
-  const [organizationProfile, setOrganizationProfile] = useState<any>(null);
+  const [organizationProfile, setOrganizationProfile] = useState<NonprofitProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedEvent, setExpandedEvent] = useState<number | null>(null);
   const [expandedVolunteer, setExpandedVolunteer] = useState<number | null>(null);
-  
-  // Add this debugging version to your OrgMyEvents component's useEffect
 
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      console.log('Starting to fetch data...');
-      
-      // Fetch organization profile
-      const profile = await getOrganizationProfile();
-      console.log('Organization profile:', profile);
-      setOrganizationProfile(profile);
-      
-      // Fetch organization's events
-      const eventsData = await getUserOpportunities();
-      console.log('Events data:', eventsData);
-      
-      // Fetch volunteers for each event
-      const eventsWithVolunteers = await Promise.all(
-        eventsData.map(async (event: Event) => {
-          try {
-            console.log(`Fetching volunteers for event ${event.id}:`, event.title);
-            const volunteers = await getEventVolunteers(event.id);
-            console.log(`Volunteers for event ${event.id}:`, volunteers);
-            return { ...event, volunteers };
-          } catch (error) {
-            console.error(`Error fetching volunteers for event ${event.id}:`, error);
-            // Log more details about the error
-            if (error instanceof Error) {
-              console.error('Error message:', error.message);
-            }
-            return { ...event, volunteers: [] };
-          }
-        })
-      );
-      
-      console.log('Final events with volunteers:', eventsWithVolunteers);
-      setEvents(eventsWithVolunteers);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      // Log more details about the error
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchData();
-}, []);
-  
-  // Function to categorize events by date/time
-  const categorizeEvents = (eventsToFilter: EventWithVolunteers[]) => {
-    const currentDateTime = new Date();
-    const upcoming: EventWithVolunteers[] = [];
-    const past: EventWithVolunteers[] = [];
-    
-    eventsToFilter.forEach((event: EventWithVolunteers) => {
-      // Parse date without timezone conversion
-      const [year, month, day] = event.startDate.split('-').map(Number);
-      const eventDate = new Date(year, month - 1, day);
-      
-      // Use raw time for comparison
-      const timeToUse = event.rawTime || event.startTime;
-      const [hours, minutes] = timeToUse.split(':').map(Number);
-      eventDate.setHours(hours, minutes, 0, 0);
-      
-      // Compare the full datetime (date + time)
-      if (eventDate > currentDateTime) {
-        upcoming.push(event);
-      } else {
-        past.push(event);
-      }
-    });
-    
-    return { upcoming, past };
-  };
-  
-  // Filter events based on search query
-  const filteredEvents = events.filter(event =>
-    event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    event.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    event.volunteers.some(volunteer => 
-      volunteer.full_name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  );
-
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'Date TBD';
-    try {
-      const [year, month, day] = dateString.split('-').map(Number);
-      const date = new Date(year, month - 1, day);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: 'numeric'
-      });
-    } catch (error) {
-      return 'Invalid Date';
-    }
-  };
-
-  // Format time for display
-  const formatTime = (timeString: string) => {
-    if (!timeString) return 'Time TBD';
-    try {
-      const [hours, minutes] = timeString.split(':').map(Number);
-      const period = hours >= 12 ? 'PM' : 'AM';
-      const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-      const displayMinutes = minutes.toString().padStart(2, '0');
-      return `${displayHours}:${displayMinutes} ${period} (PST)`;
-    } catch (error) {
-      return timeString;
-    }
-  };
-
-  // Handle removing volunteer from event - using user ID as identifier
-  const handleRemoveVolunteer = async (eventId: number, userId: number) => {
-    if (window.confirm('Are you sure you want to remove this volunteer from the event?')) {
+  useEffect(() => {
+    const fetchData = async () => {
       try {
-        await removeVolunteerFromEvent(eventId, userId);
-        // Update the local state
-        setEvents(prevEvents => 
-          prevEvents.map(event => 
-            event.id === eventId 
-              ? { ...event, volunteers: event.volunteers.filter(v => v.user_id !== userId) }
-              : event
+        setOrganizationProfile(await getNonprofitProfile());
+        const opportunities = await getMyOpportunities();
+        setEvents(
+          await Promise.all(
+            opportunities.map(async (event) => ({
+              ...event,
+              volunteers: await getEventVolunteers(event.id).catch(() => []),
+            }))
           )
         );
       } catch (error) {
-        console.error('Error removing volunteer:', error);
-        alert('Failed to remove volunteer. Please try again.');
+        console.error('Error fetching events:', error);
+      } finally {
+        setLoading(false);
       }
+    };
+    fetchData();
+  }, []);
+
+  const handleRemoveVolunteer = async (eventId: number, userId: number) => {
+    if (!window.confirm('Are you sure you want to remove this volunteer from the event?')) return;
+    try {
+      await removeVolunteer(eventId, userId);
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === eventId ? { ...event, volunteers: event.volunteers.filter((v) => v.user_id !== userId) } : event
+        )
+      );
+    } catch {
+      alert('Failed to remove volunteer. Please try again.');
     }
   };
 
   if (loading) {
     return (
       <>
-        <NavBar userType="organization"/>
+        <NavBar userType="nonprofit" />
         <div className="landing-page__content">
           <p>Loading...</p>
         </div>
@@ -165,13 +119,37 @@ useEffect(() => {
     );
   }
 
-  // Get categorized events from filtered results
-  const { upcoming: upcomingEvents, past: pastEvents } = categorizeEvents(filteredEvents);
+  const query = searchQuery.toLowerCase();
+  const filteredEvents = events.filter(
+    (event) =>
+      event.title.toLowerCase().includes(query) ||
+      event.location.toLowerCase().includes(query) ||
+      event.volunteers.some((volunteer) => volunteer.full_name.toLowerCase().includes(query))
+  );
+  const { upcoming: upcomingEvents, past: pastEvents } = splitPastAndUpcoming(filteredEvents);
 
-  return(
+  const renderVolunteers = (event: EventWithVolunteers, canRemove: boolean, emptyMessage: string) => (
+    <div className="volunteers-list">
+      {event.volunteers.length > 0 ? (
+        event.volunteers.map((volunteer) => (
+          <VolunteerRow
+            key={volunteer.user_id}
+            volunteer={volunteer}
+            expanded={expandedVolunteer === volunteer.user_id}
+            onToggle={() => setExpandedVolunteer(expandedVolunteer === volunteer.user_id ? null : volunteer.user_id)}
+            onRemove={canRemove ? () => handleRemoveVolunteer(event.id, volunteer.user_id) : undefined}
+          />
+        ))
+      ) : (
+        <p className="no-volunteers">{emptyMessage}</p>
+      )}
+    </div>
+  );
+
+  return (
     <>
-      <NavBar userType="organization"/>
-      
+      <NavBar userType="nonprofit" />
+
       <div className="landing-page__content">
         <div className="landing-page-header">
           <h1 className="landing-page__greeting">
@@ -182,7 +160,6 @@ useEffect(() => {
           </p>
         </div>
 
-        {/* Centered Search Bar */}
         <div className="search-container-centered">
           <input
             type="text"
@@ -194,12 +171,10 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* Split Layout for Events */}
       <div className="events-split-container">
-        {/* Past Events Section - Left Half */}
         <div className="events-section-half past-events-section">
           <h2 className="section-title">Past Events</h2>
-          
+
           {pastEvents.length > 0 ? (
             <div className="events-list">
               {pastEvents.map((event) => (
@@ -208,7 +183,9 @@ useEffect(() => {
                     <div className="event-info">
                       <h3 className="event-title">{event.title}</h3>
                       <div className="event-details">
-                        <span className="event-date-past">{formatDate(event.startDate)} at {formatTime(event.startTime)}</span>
+                        <span className="event-date-past">
+                          {formatDate(event.startDate)} at {formatTime(event.startTime)} (PST)
+                        </span>
                         <span className="event-location">{event.location}</span>
                       </div>
                     </div>
@@ -217,80 +194,22 @@ useEffect(() => {
                       <span className="expand-icon">{expandedEvent === event.id ? '▼' : '▶'}</span>
                     </div>
                   </div>
-                  
-                  {expandedEvent === event.id && (
-                    <div className="volunteers-list">
-                      {event.volunteers.length > 0 ? (
-                        event.volunteers.map((volunteer) => (
-                          <div key={volunteer.user_id} className="volunteer-item">
-                            <div 
-                              className="volunteer-basic-info"
-                              onClick={() => setExpandedVolunteer(expandedVolunteer === volunteer.user_id ? null : volunteer.user_id)}
-                            >
-                              <span className="volunteer-name">{volunteer.full_name}</span>
-                              <span className="expand-volunteer-icon">
-                                {expandedVolunteer === volunteer.user_id ? '▼' : '▶'}
-                              </span>
-                            </div>
-                            
-                            {expandedVolunteer === volunteer.user_id && (
-                              <div className="volunteer-details">
-                                <div className="detail-row">
-                                  <strong>Age:</strong> {volunteer.age}
-                                </div>
-                                <div className="detail-row">
-                                  <strong>Location:</strong> {volunteer.school}
-                                </div>
-                                <div className="detail-row">
-                                  <strong>Email:</strong> {volunteer.email}
-                                </div>
-                                {volunteer.phone && (
-                                  <div className="detail-row">
-                                    <strong>Phone:</strong> {volunteer.phone}
-                                  </div>
-                                )}
-                                {volunteer.bio && (
-                                  <div className="detail-row">
-                                    <strong>Bio:</strong> {volunteer.bio}
-                                  </div>
-                                )}
-                                {volunteer.interests && (
-                                  <div className="detail-row">
-                                    <strong>Interests:</strong> {volunteer.interests}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="no-volunteers">No volunteers participated</p>
-                      )}
-                    </div>
-                  )}
+
+                  {expandedEvent === event.id && renderVolunteers(event, false, 'No volunteers participated')}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="no-events">
-              {searchQuery ? 
-                "No past events match your search." : 
-                "No past events found."
-              }
-            </p>
+            <p className="no-events">{searchQuery ? "No past events match your search." : "No past events found."}</p>
           )}
         </div>
 
-        {/* Upcoming Events Section - Right Half */}
         <div className="events-section-half upcoming-events-section">
           <h2 className="section-title">Upcoming Events</h2>
           <p className="events-count">
-            {searchQuery ? 
-              `Found ${upcomingEvents.length} upcoming events` : 
-              `You have ${upcomingEvents.length} upcoming events`
-            }
+            {searchQuery ? `Found ${upcomingEvents.length} upcoming events` : `You have ${upcomingEvents.length} upcoming events`}
           </p>
-          
+
           {upcomingEvents.length > 0 ? (
             <div className="events-list">
               {upcomingEvents.map((event) => (
@@ -299,7 +218,9 @@ useEffect(() => {
                     <div className="event-info">
                       <h3 className="event-title">{event.title}</h3>
                       <div className="event-details">
-                        <span className="event-date">{formatDate(event.startDate)} at {formatTime(event.startTime)}</span>
+                        <span className="event-date">
+                          {formatDate(event.startDate)} at {formatTime(event.startTime)} (PST)
+                        </span>
                         <span className="event-location">{event.location}</span>
                       </div>
                     </div>
@@ -308,84 +229,20 @@ useEffect(() => {
                       <span className="expand-icon">{expandedEvent === event.id ? '▼' : '▶'}</span>
                     </div>
                   </div>
-                  
-                  {expandedEvent === event.id && (
-                    <div className="volunteers-list">
-                      {event.volunteers.length > 0 ? (
-                        event.volunteers.map((volunteer) => (
-                          <div key={volunteer.user_id} className="volunteer-item">
-                            <div 
-                              className="volunteer-basic-info"
-                              onClick={() => setExpandedVolunteer(expandedVolunteer === volunteer.user_id ? null : volunteer.user_id)}
-                            >
-                              <span className="volunteer-name">{volunteer.full_name}</span>
-                              <div className="volunteer-actions">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveVolunteer(event.id, volunteer.user_id);
-                                  }}
-                                  className="remove-volunteer-btn"
-                                  title="Remove volunteer"
-                                >
-                                  ✕
-                                </button>
-                                <span className="expand-volunteer-icon">
-                                  {expandedVolunteer === volunteer.user_id ? '▼' : '▶'}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            {expandedVolunteer === volunteer.user_id && (
-                              <div className="volunteer-details">
-                                <div className="detail-row">
-                                  <strong>Age:</strong> {volunteer.age}
-                                </div>
-                                <div className="detail-row">
-                                  <strong>Location:</strong> {volunteer.school}
-                                </div>
-                                <div className="detail-row">
-                                  <strong>Email:</strong> {volunteer.email}
-                                </div>
-                                {volunteer.phone && (
-                                  <div className="detail-row">
-                                    <strong>Phone:</strong> {volunteer.phone}
-                                  </div>
-                                )}
-                                {volunteer.bio && (
-                                  <div className="detail-row">
-                                    <strong>Bio:</strong> {volunteer.bio}
-                                  </div>
-                                )}
-                                {volunteer.interests && (
-                                  <div className="detail-row">
-                                    <strong>Interests:</strong> {volunteer.interests}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="no-volunteers">No volunteers signed up yet</p>
-                      )}
-                    </div>
-                  )}
+
+                  {expandedEvent === event.id && renderVolunteers(event, true, 'No volunteers signed up yet')}
                 </div>
               ))}
             </div>
           ) : (
             <p className="no-events">
-              {searchQuery ? 
-                "No upcoming events match your search." : 
-                "No upcoming events at this time."
-              }
+              {searchQuery ? "No upcoming events match your search." : "No upcoming events at this time."}
             </p>
           )}
         </div>
       </div>
     </>
-  )
+  );
 }
 
 export default OrgMyEvents;

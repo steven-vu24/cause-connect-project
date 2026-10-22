@@ -1,4 +1,6 @@
+node_modules/
 .env
-.env.local
-/node_modules
-node_modules
+.env*.local
+.DS_Store
+client/build/
+server/local.db*

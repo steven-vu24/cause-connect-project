@@ -1,53 +1,55 @@
-//Defining types for the application
-export type User = {
-    id: number;
-    email: string; // Changed from username to email to match schema
-    user_type: "student" | "organization";
-}
+export type UserType = 'student' | 'nonprofit';
 
-export type Student = {
-    id: number;
-    user_id: number;
-    full_name: string;
-    age: number;
-    school: string;
-    bio: string;
-    interests: string;
-    email: string;
-    phone?: string; // Made optional since it's not in  schema
-    upcoming_events?: number; // Made optional
-    past_events?: number; // Made optional
-    signup_date?: string; // Added for volunteer signup tracking
-}
-
-export type Organization = {
-    id: number;
-    user_id: number;
-    name: string;
-    location: string;
-    category: string;
-    statement: string;
-    volunteers: string;
-    email: string;
-}
-
-export type EventStatus = "draft" | "upcoming" | "completed";
-
+// The event shape returned by every /api/opportunities route (server/events.js).
 export type Event = {
-    id: number;
-    title: string; 
-    organization: string;
-    body: string;
-    createdDate: string;
-    author_id: number;
-    startDate: string;
-    startTime: string;
-    endDate: string;
-    endTime: string;
-    location: string;
-    cause: string;
-    status: EventStatus;
-    formattedDate?: string;
-    formattedTime?: string;
-    rawTime?: string;
-}
+  id: number;
+  title: string;
+  organization: string;
+  body: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  location: string;
+  cause: string;
+  distance?: string;
+};
+
+export type StudentProfile = {
+  full_name: string;
+  age: number;
+  school: string;
+  bio: string;
+  interests: string;
+};
+
+export type NonprofitProfile = {
+  nonprofit_name: string;
+  location: string;
+  category: string;
+  statement: string;
+};
+
+export type CurrentUser<Profile> = {
+  id: number;
+  email: string;
+  user_type: UserType;
+  profile: Profile | null;
+};
+
+export type Volunteer = StudentProfile & {
+  id: number;
+  user_id: number;
+  email: string;
+  signup_date: string;
+};
+
+export type OpportunityInput = {
+  nonprofit_name: string;
+  title: string;
+  description: string;
+  date: string;
+  time: string;
+  end_time: string;
+  location: string;
+};

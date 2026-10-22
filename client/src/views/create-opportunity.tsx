@@ -1,9 +1,10 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NavBar from '../components/navBar';
-import { createOpportunity, getOrganizationProfile } from '../utils/events-utils';
-import '../views/styles/create-opportunity.css'; 
-import { Event } from "../types/types";
+import { createOpportunity, getNonprofitProfile } from '../utils/api';
+import { formatDate, formatTime } from '../utils/time';
+import { NonprofitProfile } from '../types/types';
+import './styles/create-opportunity.css';
 
 interface FormData {
   name: string;
@@ -12,10 +13,6 @@ interface FormData {
   endTime: string;
   location: string;
   description: string;
-}
-
-interface OrganizationProfile {
-  nonprofit_name: string;
 }
 
 type FormStep = 'details' | 'review' | 'publish';
@@ -31,26 +28,16 @@ function CreateEvent() {
     location: '',
     description: ''
   });
-  const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile | null>(null);
+  const [organizationProfile, setOrganizationProfile] = useState<NonprofitProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch organization profile on component mount
   useEffect(() => {
-    const fetchOrganizationProfile = async () => {
-      try {
-        const profile = await getOrganizationProfile();
-        setOrganizationProfile(profile);
-      } catch (error) {
-        console.error('Error fetching organization profile:', error);
-        setErrors({ name: 'Failed to load organization profile. Please try again.' });
-      } finally {
-        setIsLoadingProfile(false);
-      }
-    };
-
-    fetchOrganizationProfile();
+    getNonprofitProfile()
+      .then(setOrganizationProfile)
+      .catch(() => setErrors({ name: 'Failed to load organization profile. Please try again.' }))
+      .finally(() => setIsLoadingProfile(false));
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -60,7 +47,6 @@ function CreateEvent() {
       [name]: value
     }));
     
-    // Clear error for this field if it exists
     if (errors[name as keyof FormData]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -74,7 +60,6 @@ function CreateEvent() {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
     let isValid = true;
 
-    // Validate required fields
     if (!formData.name.trim()) {
       newErrors.name = 'Opportunity name is required';
       isValid = false;
@@ -95,7 +80,6 @@ function CreateEvent() {
       isValid = false;
     }
 
-    // Validate end time if both start and end times are provided
     if (formData.endTime && formData.startTime) {
       const startMinutes = timeToMinutes(formData.startTime);
       const endMinutes = timeToMinutes(formData.endTime);
@@ -120,35 +104,9 @@ function CreateEvent() {
     return isValid;
   };
 
-  // Helper function to convert time string to minutes for comparison
   const timeToMinutes = (timeString: string): number => {
     const [hours, minutes] = timeString.split(':').map(Number);
     return hours * 60 + minutes;
-  };
-
-  // Helper function to format date for display without timezone issues
-  const formatDateDisplay = (dateString: string) => {
-  if (!dateString) return '';
-  
-  const [year, month, day] = dateString.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  
-  return date.toLocaleDateString();
-};
-
-  // Helper function to format time for display
-  const formatTimeDisplay = (timeString: string) => {
-    if (!timeString) return '';
-    
-    try {
-      const [hours, minutes] = timeString.split(':').map(Number);
-      const period = hours >= 12 ? 'PM' : 'AM';
-      const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-      const displayMinutes = minutes.toString().padStart(2, '0');
-      return `${displayHours}:${displayMinutes} ${period}`;
-    } catch (error) {
-      return timeString;
-    }
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -163,7 +121,6 @@ function CreateEvent() {
       setCurrentStep('publish');
       window.scrollTo(0, 0);
     } else if (currentStep === 'publish') {
-      // Final submission - send data to backend
       if (!organizationProfile) {
         setErrors({ name: 'Organization profile not loaded. Please refresh and try again.' });
         return;
@@ -172,19 +129,16 @@ function CreateEvent() {
       setIsSubmitting(true);
       
       try {
-        const result = await createOpportunity(
-          organizationProfile.nonprofit_name,
-          formData.name,
-          formData.description,
-          formData.date,
-          formData.startTime,
-          formData.location,
-          formData.endTime
-        );
-        
-        console.log('Opportunity created successfully:', result);
-        
-        // Redirect to confirmation page or dashboard
+        const result = await createOpportunity({
+          nonprofit_name: organizationProfile.nonprofit_name,
+          title: formData.name,
+          description: formData.description,
+          date: formData.date,
+          time: formData.startTime,
+          end_time: formData.endTime,
+          location: formData.location,
+        });
+
         navigate('/org-my-events', { 
           state: { 
             success: true, 
@@ -192,8 +146,7 @@ function CreateEvent() {
             opportunityId: result.opportunityId
           } 
         });
-      } catch (error) {
-        console.error('Error creating opportunity:', error);
+      } catch {
         setErrors({ name: 'Failed to create opportunity. Please try again.' });
         setCurrentStep('details');
       } finally {
@@ -217,7 +170,6 @@ function CreateEvent() {
     window.scrollTo(0, 0);
   };
 
-  // Helper function to get today's date in local timezone
   const getTodayLocalDate = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -226,11 +178,10 @@ function CreateEvent() {
     return `${year}-${month}-${day}`;
   };
 
-  // Show loading state while fetching organization profile
   if (isLoadingProfile) {
     return (
       <div className="create-opportunity-page">
-        <NavBar userType="organization" />
+        <NavBar userType="nonprofit" />
         <div className="page-content">
           <div className="create-opportunity-container">
             <p>Loading organization profile...</p>
@@ -240,11 +191,10 @@ function CreateEvent() {
     );
   }
 
-  // Show error if organization profile failed to load
   if (!organizationProfile) {
     return (
       <div className="create-opportunity-page">
-        <NavBar userType="organization" />
+        <NavBar userType="nonprofit" />
         <div className="page-content">
           <div className="create-opportunity-container">
             <p>Error loading organization profile. Please refresh the page and try again.</p>
@@ -282,11 +232,10 @@ function CreateEvent() {
 
   return (
     <div className="create-opportunity-page">
-      <NavBar userType="organization" />
+      <NavBar userType="nonprofit" />
       
       <div className="page-content">
         <div className="create-opportunity-container">
-          {/* Header section with progress indicator */}
           <header className="header-section">
             <div className="header-content">
               <h1 className="page-title">{getStepTitle()}</h1>
@@ -318,7 +267,6 @@ function CreateEvent() {
           </header>
 
           <form onSubmit={handleSubmit} className="opportunity-form">
-            {/* Form content based on current step */}
             {currentStep === 'details' && (
               <>
                 <div className="form-section">
@@ -441,11 +389,11 @@ function CreateEvent() {
                   <p>{formData.name}</p>
                   
                   <h4><strong>Date:</strong></h4>
-                  <p>{formatDateDisplay(formData.date)}</p>                  
+                  <p>{formatDate(formData.date)}</p>                  
                   <h4><strong>Time:</strong></h4>
                   <p>
-                    {formatTimeDisplay(formData.startTime)}
-                    {formData.endTime && ` - ${formatTimeDisplay(formData.endTime)}`}
+                    {formatTime(formData.startTime)}
+                    {formData.endTime && ` - ${formatTime(formData.endTime)}`}
                   </p>
                   
                   <h4><strong>Location:</strong></h4>
@@ -472,7 +420,7 @@ function CreateEvent() {
                   <h4>Quick Summary:</h4>
                   <ul>
                     <li><strong>Event:</strong> {formData.name}</li>
-                    <li><strong>Date & Time:</strong> {formatDateDisplay(formData.date)} at {formatTimeDisplay(formData.startTime)}{formData.endTime && ` - ${formatTimeDisplay(formData.endTime)}`}</li>
+                    <li><strong>Date & Time:</strong> {formatDate(formData.date)} at {formatTime(formData.startTime)}{formData.endTime && ` - ${formatTime(formData.endTime)}`}</li>
                     <li><strong>Location:</strong> {formData.location}</li>
                     <li><strong>Organization:</strong> {organizationProfile.nonprofit_name}</li>
                   </ul>

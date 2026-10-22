@@ -1,4 +1,3 @@
-/* src/styles/home.css */
 .home {
   display: flex;
   height: 100vh;
@@ -116,7 +115,6 @@ form {
   margin-bottom: 5px; 
 }
 
-
 input {
   padding: 10px;
   font-size: 1rem;
@@ -178,7 +176,6 @@ textarea{
 .register-link:hover {
   text-decoration: underline;
 }
-
 
 @media (max-width: 768px) {
   .home {

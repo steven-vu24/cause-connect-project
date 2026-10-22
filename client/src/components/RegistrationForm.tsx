@@ -1,76 +1,57 @@
 import React, { useState } from "react";
 import "../views/styles/registration.css";
-import { signup, login} from "../utils/user-utils";
-import {saveUserProfile} from "../utils/profile-utils";
+import { login, saveProfile, signup } from "../utils/api";
+import { CAUSES, joinCauses } from "../utils/causes";
+
+const isValidEmail = (email: string) => {
+  const parts = email.split("@");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return false;
+  const labels = parts[1].split(".");
+  return labels.length > 1 && labels[labels.length - 1].length >= 2;
+};
+
+const CauseButtons = ({ selected, onToggle }: { selected: string[]; onToggle: (cause: string) => void }) => (
+  <div className="interests-grid">
+    {CAUSES.map((cause) => (
+      <button
+        key={cause}
+        type="button"
+        className={`interest-btn ${selected.includes(cause) ? "selected" : ""}`}
+        onClick={() => onToggle(cause)}
+      >
+        {selected.includes(cause) ? cause : `+ ${cause}`}
+      </button>
+    ))}
+  </div>
+);
+
+const toggle = (list: string[], item: string) =>
+  list.includes(item) ? list.filter((i) => i !== item) : [...list, item];
 
 const Registration = () => {
   const [usertype, setUsertype] = useState<string | null>(null);
   const [slide, setSlide] = useState(0);
+
+  const [fullname, setFullname] = useState("");
+  const [age, setAge] = useState(0);
+  const [school, setSchool] = useState("");
+  const [bio, setBio] = useState("");
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
-  const [fullname, setFullname] = useState<string | null>(null);
-  const [age, setAge] = useState<number | null>(null);
-  const [school, setSchool] = useState<string | null>(null);
-  const [bio, setBio] = useState<string | null>(null);
-
-  const [nonprofitName, setNonprofitName] = useState<string | null>(null);
+  const [nonprofitName, setNonprofitName] = useState("");
+  const [location, setLocation] = useState("");
+  const [mission, setMission] = useState("");
   const [selectedCauses, setSelectedCauses] = useState<string[]>([]);
-  const [mission, setMission] = useState<string | null>(null);
-  const [location, setLocation] = useState<string | null>(null);
 
-  const [email, setEmail] = useState<string | null>(null);
-  const [password, setPassword] = useState<string | null>(null);
-  const [confirmPassword, setConfirmPassword] = useState<string | null>(null);
-  
-  const [passwordsMatch, setPasswordsMatch] = useState<boolean>(true);
-  const [emailValid, setEmailValid] = useState<boolean>(true);
-
-  // Email validation function
-  const validateEmail = (email: string): boolean => {
-    if (!email) return false;
-    
-    // Check for @ symbol
-    if (!email.includes('@')) return false;
-    
-    // Split by @ and check for domain part
-    const parts = email.split('@');
-    if (parts.length !== 2) return false;
-    
-    const [localPart, domainPart] = parts;
-    
-    // Check that both parts exist
-    if (!localPart || !domainPart) return false;
-    
-    // Check that domain part contains a dot
-    if (!domainPart.includes('.')) return false;
-    
-    // Check that there's content after the dot
-    const domainParts = domainPart.split('.');
-    const lastPart = domainParts[domainParts.length - 1];
-    if (!lastPart || lastPart.length < 2) return false;
-    
-    return true;
-  };
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordsMatch, setPasswordsMatch] = useState(true);
+  const [emailValid, setEmailValid] = useState(true);
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
-    setEmailValid(validateEmail(value));
-  };
-
-  const toggleCause = (cause: string) => {
-    setSelectedCauses((prev) =>
-      prev.includes(cause)
-        ? prev.filter((c) => c !== cause)
-        : [...prev, cause]
-    );
-  };
-
-  const toggleInterest = (interest: string) => {
-    setSelectedInterests((prev) =>
-      prev.includes(interest)
-        ? prev.filter((i) => i !== interest)
-        : [...prev, interest]
-    );
+    setEmailValid(isValidEmail(value));
   };
 
   const handleUsertypeSelect = (type: string) => {
@@ -78,54 +59,20 @@ const Registration = () => {
     setSlide(1);
   };
 
-  const handleNextSlide = () => {
-    setSlide((prev) => prev + 1);
-  };
-
-  const handlePreviousSlide = () => {
-    setSlide((prev) => Math.max(prev - 1, 0));
-  };
+  const handleNextSlide = () => setSlide((prev) => prev + 1);
+  const handlePreviousSlide = () => setSlide((prev) => Math.max(prev - 1, 0));
 
   const handleComplete = async () => {
     if (password !== confirmPassword) {
       setPasswordsMatch(false);
       return;
     }
-
-    if (!email || !password || !confirmPassword || !usertype) {
-      console.error("Missing required fields");
-      return;
-    }
-
-    if (!emailValid) {
-      console.error("Invalid email format");
-      return;
-    }
-
+    if (!email || !password || !usertype || !emailValid) return;
     setPasswordsMatch(true);
-
-    const registrationData = {
-      usertype,
-      fullname,
-      age,
-      school,
-      bio,
-      nonprofitName,
-      selectedCauses,
-      mission,
-      location,
-      selectedInterests,
-      email,
-      password,
-    };
-
-    console.log("Registration Data:", registrationData);
 
     try {
       const res = await signup(email, password, usertype);
-
       if (!res.success) {
-        console.error("Registration failed:", res.message);
         alert("Registration failed: " + res.message);
         return;
       }
@@ -136,27 +83,18 @@ const Registration = () => {
         return;
       }
 
-      const profileData =
-        usertype === "student"
-          ? {
-              full_name: fullname,
-              age,
-              school,
-              bio,
-              interests: selectedInterests.join(", "),
-            }
-          : {
-              nonprofit_name: nonprofitName,
-              location,
-              category: selectedCauses.join(", "),
-              statement: mission,
-            };
-
       try {
-        const profileRes = await saveUserProfile(profileData);
-        console.log("Profile saved:", profileRes);
-      } catch (err) {
-        console.error("Profile saving failed:", err);
+        await saveProfile(
+          usertype === "student"
+            ? { full_name: fullname, age, school, bio, interests: joinCauses(selectedInterests) }
+            : {
+                nonprofit_name: nonprofitName,
+                location,
+                category: joinCauses(selectedCauses),
+                statement: mission,
+              }
+        );
+      } catch {
         alert("Account created, but saving your profile failed.");
       }
 
@@ -164,8 +102,7 @@ const Registration = () => {
       setTimeout(() => {
         window.location.href = "/";
       }, 2000);
-    } catch (error) {
-      console.error("Signup error:", error);
+    } catch {
       alert("An error occurred during registration. Please try again.");
     }
   };
@@ -182,7 +119,6 @@ const Registration = () => {
         </div>
       )}
 
-      {/* Student Slide 1: Personal Info */}
       {slide === 1 && usertype === "student" && (
         <form className="form-registration" onSubmit={(e) => { e.preventDefault(); handleNextSlide(); }}>
           <h2>Tell us about yourself..</h2>
@@ -197,7 +133,6 @@ const Registration = () => {
         </form>
       )}
 
-      {/* Nonprofit Slide 1: Basic Info (no causes) */}
       {slide === 1 && usertype === "nonprofit" && (
         <form className="form-registration" onSubmit={(e) => { e.preventDefault(); handleNextSlide(); }}>
           <h2>Nonprofit Info</h2>
@@ -211,27 +146,13 @@ const Registration = () => {
         </form>
       )}
 
-      {/* Student Slide 2: Interests */}
       {slide === 2 && usertype === "student" && (
         <form className="form-registration" onSubmit={(e) => { e.preventDefault(); handleNextSlide(); }}>
           <h2>What are your interests and passions?</h2>
-          <div className="interests-grid">
-            {[
-              "Animals", "Children & Youth", "Cultural & Education", "Disabilities", "Disaster Relief", "Elderly",
-              "Environment", "Global – Local Based", "Health & Disease", "Homeless", "Hunger & Poverty",
-              "International", "Military Charities", "Racial Equality", "Service & Benevolence Clubs", "Women's Issues", 
-              "Sports", "Music/Art", "Engineering", "Mathematics", "Science", "Social Justice"
-            ].map((interest) => (
-              <button
-                key={interest}
-                type="button"
-                className={`interest-btn ${selectedInterests.includes(interest) ? 'selected' : ''}`}
-                onClick={() => toggleInterest(interest)}
-              >
-                {selectedInterests.includes(interest) ? interest : `+ ${interest}`}
-              </button>
-            ))}
-          </div>
+          <CauseButtons
+            selected={selectedInterests}
+            onToggle={(cause) => setSelectedInterests((prev) => toggle(prev, cause))}
+          />
           <div className="form-nav-buttons">
             <button type="button" onClick={handlePreviousSlide}>Back</button>
             <button type="submit">Next</button>
@@ -239,28 +160,14 @@ const Registration = () => {
         </form>
       )}
 
-      {/* Nonprofit Slide 2: Causes Selection */}
       {slide === 2 && usertype === "nonprofit" && (
         <form className="form-registration" onSubmit={(e) => { e.preventDefault(); handleNextSlide(); }}>
           <h2>Select your cause(s)</h2>
           <p className="cause-prompt">What causes does your nonprofit focus on?</p>
-          <div className="interests-grid">
-            {[
-              "Animals", "Children & Youth", "Cultural & Education", "Disabilities", "Disaster Relief", "Elderly",
-              "Environment", "Global – Local Based", "Health & Disease", "Homeless", "Hunger & Poverty",
-              "International", "Military Charities", "Racial Equality", "Service & Benevolence Clubs", "Women's Issues", 
-              "Sports", "Music/Art", "Engineering", "Mathematics", "Science", "Social Justice"
-            ].map((cause) => (
-              <button
-                key={cause}
-                type="button"
-                className={`interest-btn ${selectedCauses.includes(cause) ? 'selected' : ''}`}
-                onClick={() => toggleCause(cause)}
-              >
-                {selectedCauses.includes(cause) ? cause : `+ ${cause}`}
-              </button>
-            ))}
-          </div>
+          <CauseButtons
+            selected={selectedCauses}
+            onToggle={(cause) => setSelectedCauses((prev) => toggle(prev, cause))}
+          />
           <div className="form-nav-buttons">
             <button type="button" onClick={handlePreviousSlide}>Back</button>
             <button type="submit">Next</button>
@@ -268,7 +175,6 @@ const Registration = () => {
         </form>
       )}
 
-      {/* Slide 3: Account Creation (both user types) */}
       {slide === 3 && (
         <form className="form-registration" onSubmit={(e) => { e.preventDefault(); handleComplete(); }}>
           <h2>Create your account!</h2>
@@ -301,8 +207,8 @@ const Registration = () => {
           )}
           <div className="form-nav-buttons final-step-buttons">
             <button type="button" onClick={handlePreviousSlide}>Back</button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="complete-registration"
               disabled={!emailValid || !email}
             >

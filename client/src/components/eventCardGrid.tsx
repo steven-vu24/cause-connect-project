@@ -1,68 +1,45 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import EventCard from './eventCard';
 import "../views/styles/eventGrid.css";
-import { Event } from "../types/types";
+import { Event, UserType } from "../types/types";
+
+const PAGE_SIZE = 12;
 
 interface EventCardGridProps {
   events: Event[];
-  userType: "student" | "organization";
+  userType: UserType;
   onEventUpdated?: () => void;
 }
 
 const EventCardGrid: React.FC<EventCardGridProps> = ({ events, userType, onEventUpdated }) => {
-  const [displayedEvents, setDisplayedEvents] = useState<Event[]>(events.slice(0, 12));
-  const [loading, setLoading] = useState(false);
-
-  const handleScroll = () => {
-    const scrollPosition = window.innerHeight + document.documentElement.scrollTop;
-    const scrollThreshold = document.documentElement.offsetHeight - 100; // Trigger 100px before bottom
-    const bottom = scrollPosition >= scrollThreshold;
-
-    if (bottom && !loading && displayedEvents.length < events.length) {
-      setLoading(true);
-    }
-  };
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const hasMore = visibleCount < events.length;
 
   useEffect(() => {
-    if (loading) {
-      setTimeout(() => {
-        const moreEvents = events.slice(displayedEvents.length, displayedEvents.length + 12);
-        setDisplayedEvents(prevEvents => [...prevEvents, ...moreEvents]);
-        setLoading(false);
-      }, 500); // Simulate slight delay
-    }
-  }, [loading, displayedEvents, events]);
-
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, [displayedEvents, events]);
-
-  useEffect(() => {
-    setDisplayedEvents(events.slice(0, 12));
+    setVisibleCount(PAGE_SIZE);
   }, [events]);
+
+  useEffect(() => {
+    if (!hasMore) return;
+    const showMoreNearBottom = () => {
+      const scrolledTo = window.innerHeight + document.documentElement.scrollTop;
+      if (scrolledTo >= document.documentElement.offsetHeight - 100) {
+        setVisibleCount((count) => count + PAGE_SIZE);
+      }
+    };
+    window.addEventListener('scroll', showMoreNearBottom);
+    return () => window.removeEventListener('scroll', showMoreNearBottom);
+  }, [hasMore]);
 
   return (
     <div className="event-card-grid">
-      {displayedEvents.map((event) => (
-        <EventCard 
-          key={event.id} 
-          event={event} 
-          userType={userType} 
-          onEventUpdated={onEventUpdated}
-        />
+      {events.slice(0, visibleCount).map((event) => (
+        <EventCard key={event.id} event={event} userType={userType} onEventUpdated={onEventUpdated} />
       ))}
 
-      {loading && <div className="loading">Loading...</div>}
-
-      {!loading && displayedEvents.length < events.length && (
+      {hasMore && (
         <div className="show-more-container">
-          <button 
-            onClick={() => setLoading(true)} 
-            className="show-more-button"
-          >
+          <button onClick={() => setVisibleCount((count) => count + PAGE_SIZE)} className="show-more-button">
             Show More
           </button>
         </div>

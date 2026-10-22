@@ -182,7 +182,7 @@ textarea {
   .final-step-buttons {
     display: flex;
     justify-content: space-between;
-    gap: 20px; /* Optional: adds extra spacing between buttons */
+    gap: 20px;
     margin-top: 20px;
   }
   

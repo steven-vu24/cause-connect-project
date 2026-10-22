@@ -1,8 +1,6 @@
-/* Event Card Styles */
 .event-card {
   width: 100%;
-  height: 100%; /* Add this to ensure full height */
-  /* Remove max-width: 500px; - this was causing width variations */
+  height: 100%;
   margin: 0 auto;
 }
 
@@ -15,11 +13,10 @@
   transition: all 0.3s ease;
   position: relative;
   cursor: pointer;
-  height: 100%; /* Changed from auto to 100% */
+  height: 100%;
   min-height: 280px;
   display: flex;
   flex-direction: column;
-  /* Add these to prevent content overflow affecting width */
   overflow: hidden;
   word-wrap: break-word;
 }
@@ -34,7 +31,6 @@
   opacity: 0.7;
 }
 
-/* Event Badge */
 .event-badge {
   position: absolute;
   top: 12px;
@@ -58,11 +54,10 @@
   50% { opacity: 0.8; }
 }
 
-/* Event Header */
 .event-header {
   margin-bottom: 1.25rem;
   padding-right: 60px; /* Space for badge */
-  min-height: 3.5rem; /* Add fixed height for title area */
+  min-height: 3.5rem;
 }
 
 .event-card__title {
@@ -73,34 +68,26 @@
   overflow: hidden;
   color: #1A83F8;
   display: -webkit-box;
-  -webkit-line-clamp: 2; /* Limit title to 2 lines */
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  text-overflow: ellipsis; /* Add ellipsis for overflow */
-  /* Fix for italic text positioning */
+  text-overflow: ellipsis;
   width: 100%;
   box-sizing: border-box;
-  /* Prevent text from affecting card width */
   word-break: break-word;
 }
 
-/* Interest matched events - Fixed italic positioning */
 .event-card.interest-matched .event-card__title {
   font-style: italic;
-  /* Add padding to compensate for italic slant */
-  padding-right: 0.2em;
-  /* Maintain consistent positioning */
+  padding-right: 0.2em; /* Compensates for the italic slant */
   transform: none;
-  /* Alternative: Use oblique instead of italic for more consistent spacing */
-  /* font-style: oblique 15deg; */
 }
 
-/* Date and Time Section */
 .event-datetime {
   margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  min-height: 5rem; /* Add fixed height for datetime section */
+  min-height: 5rem;
 }
 
 .datetime-group {
@@ -142,11 +129,10 @@
   font-weight: 400;
 }
 
-/* Location Section */
 .event-location {
   margin-bottom: 1.25rem;
   flex-grow: 1;
-  min-height: 3.5rem; /* Add fixed height for location */
+  min-height: 3.5rem;
 }
 
 .location-label {
@@ -171,12 +157,10 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis; /* Add ellipsis for overflow */
-  /* Prevent location text from affecting card width */
+  text-overflow: ellipsis;
   word-break: break-word;
 }
 
-/* Action Button */
 .event-actions {
   margin-top: auto;
   border-top: 1px solid #f3f4f6;
@@ -236,7 +220,6 @@
   font-size: 1.1rem;
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
   .card-container {
     padding: 1.25rem;
@@ -268,17 +251,12 @@
     min-height: 3rem;
   }
 
-  /* Adjust italic padding for smaller screens */
   .event-card.interest-matched .event-card__title {
     padding-right: 0.15em;
   }
 }
 
 @media (max-width: 480px) {
-  .event-card {
-    /* Remove max-width: 100%; - let it be controlled by parent */
-  }
-  
   .card-container {
     padding: 1rem;
     min-height: 240px;
@@ -303,13 +281,11 @@
     min-height: 2.5rem;
   }
 
-  /* Adjust italic padding for mobile */
   .event-card.interest-matched .event-card__title {
     padding-right: 0.1em;
   }
 }
 
-/* Animation for card reveal */
 .event-card {
   animation: cardSlideIn 0.4s ease-out;
 }
